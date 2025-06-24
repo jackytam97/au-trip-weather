@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Personalized Trip Weather</title>
+    <style>
+        /* CSS Variables for easy theme management */
+        :root {
+            --sydney-color: #e6f7ff;
+            --sydney-border: #91d5ff;
+            --melbourne-color: #e6f9f0;
+            --melbourne-border: #a7eac5;
+            --gold-coast-color: #fffbe6;
+            --gold-coast-border: #ffe58f;
+            --trip-duration-bg: #f9f9f9;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        body, h1, p { margin: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            padding: 15px;
+        }
+
+        #app-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        
+        header h1 {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.75rem;
+            background-color: #34495e;
+            color: white;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+
+        .grid-cell {
+            border-bottom: 1px solid #e0e0e0;
+            border-left: 1px solid #e0e0e0;
+            padding: 10px;
+        }
+        .grid-cell:nth-child(7n + 1) { border-left: none; }
+
+        .grid-header {
+            text-align: center;
+            font-weight: 600;
+            padding: 12px 5px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+
+        .calendar-day {
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Highlight for the entire trip duration */
+        .trip-duration-day {
+            background-color: var(--trip-duration-bg);
+        }
+
+        .date-number { font-weight: 600; }
+
+        .weather-entry {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #f8f8f8; /* Default for non-location weather */
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.85rem;
+        }
+        .weather-icon img { width: 40px; height: 40px; }
+        .weather-details strong { display: block; font-weight: 600; }
+        .weather-details span { color: #555; }
+
+        /* Location-specific color highlights */
+        .sydney-weather { background-color: var(--sydney-color); border-color: var(--sydney-border); }
+        .melbourne-weather { background-color: var(--melbourne-color); border-color: var(--melbourne-border); }
+        .gold-coast-weather { background-color: var(--gold-coast-color); border-color: var(--gold-coast-border); }
+
+        /* Placeholder for future dates */
+        .forecast-unavailable {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #999;
+            padding: 10px;
+            background-color: #fafafa;
+            border: 1px dashed #ddd;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .status-overlay { padding: 40px 20px; text-align: center; }
+        #error-message { color: #d9534f; display: none; }
+        .loader {
+            width: 50px; height: 50px; border: 5px solid #f3f3f3;
+            border-top: 5px solid #34495e; border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 0 auto 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        footer {
+            padding: 15px; text-align: center; background-color: #f8f9fa;
+            border-top: 1px solid #e0e0e0; font-size: 0.9rem;
+            display: flex; justify-content: center; flex-wrap: wrap; gap: 15px;
+        }
+        .legend-item { display: inline-flex; align-items: center; }
+        .legend-color { width: 15px; height: 15px; margin-right: 5px; border-radius: 3px; }
+        .legend-color-sydney { background-color: var(--sydney-color); border: 1px solid var(--sydney-border); }
+        .legend-color-melbourne { background-color: var(--melbourne-color); border: 1px solid var(--melbourne-border); }
+        .legend-color-gold-coast { background-color: var(--gold-coast-color); border: 1px solid var(--gold-coast-border); }
+
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            #app-container { border-radius: 0; box-shadow: none; }
+            header h1 { font-size: 1.5rem; }
+            .calendar-grid { display: block; }
+            .grid-header { display: none; }
+            .calendar-day { min-height: auto; border-left: none; padding-bottom: 20px; }
+            .date-number::after { content: ' (' attr(data-day-name) ')'; font-weight: normal; color: #777; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <header><h1>My Travel Weather</h1></header>
+        <main>
+            <div id="status-container" class="status-overlay">
+                <div id="loader" class="loader"></div>
+                <p id="loading-text">Fetching your personalized weather forecast...</p>
+                <p id="error-message">Sorry, we couldn't load the weather data. Please check your connection and try again.</p>
+            </div>
+            <div id="weather-calendar-grid" class="calendar-grid"></div>
+        </main>
+        <footer>
+            <div class="legend-item"><div class="legend-color legend-color-sydney"></div><span>Sydney</span></div>
+            <div class="legend-item"><div class="legend-color legend-color-melbourne"></div><span>Melbourne</span></div>
+            <div class="legend-item"><div class="legend-color legend-color-gold-coast"></div><span>Gold Coast</span></div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // --- 1. CONFIGURATION ---
+            const API_KEY = 'bd5e378503939ddaee76f12ad7a97608';
+            const CITIES = {
+                'Hong Kong 🇭🇰': { lat: 22.3193, lon: 114.1694, colorClass: '' },
+                'Sydney 🇦🇺': { lat: -33.8688, lon: 151.2093, colorClass: 'sydney-weather' },
+                'Melbourne 🇦🇺': { lat: -37.8136, lon: 144.9631, colorClass: 'melbourne-weather' },
+                'Gold Coast 🇦🇺': { lat: -28.0167, lon: 153.4000, colorClass: 'gold-coast-weather' }
+            };
+            const gridContainer = document.getElementById('weather-calendar-grid');
+            const statusContainer = document.getElementById('status-container');
+            const errorMessage = document.getElementById('error-message');
+            const startDate = new Date('2025-06-22T00:00:00Z');
+            const endDate = new Date('2025-07-14T00:00:00Z');
+            const tripStartDate = '2025-06-27';
+            const tripEndDate = '2025-07-14';
+            const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+            // --- 2. PRECISE ITINERARY LOGIC ---
+            function getActualLocationsForDate(dateStr) {
+                if (dateStr < '2025-06-28') return ['Hong Kong 🇭🇰'];
+                if (dateStr >= '2025-06-28' && dateStr < '2025-06-30') return ['Sydney 🇦🇺'];
+                if (dateStr === '2025-06-30') return ['Sydney 🇦🇺', 'Melbourne 🇦🇺'];
+                if (dateStr > '2025-06-30' && dateStr < '2025-07-08') return ['Melbourne 🇦🇺'];
+                if (dateStr === '2025-07-08') return ['Melbourne 🇦🇺', 'Gold Coast 🇦🇺'];
+                if (dateStr === '2025-07-09') return ['Gold Coast 🇦🇺', 'Sydney 🇦🇺'];
+                if (dateStr > '2025-07-09' && dateStr < '2025-07-14') return ['Sydney 🇦🇺'];
+                return ['Hong Kong 🇭🇰'];
+            }
+
+            // --- 3. API DATA FETCHING ---
+            async function fetchAllWeatherData() {
+                const weatherDataByDate = {};
+                const promises = Object.entries(CITIES).map(async ([name, details]) => {
+                    const url = `https://api.openweathermap.org/data/2.5/forecast/daily?lat=${details.lat}&lon=${details.lon}&cnt=16&units=metric&appid=${API_KEY}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`API request failed for ${name}`);
+                    const data = await response.json();
+                    data.list.forEach(day => {
+                        const dateKey = new Date(day.dt * 1000).toISOString().slice(0, 10);
+                        if (!weatherDataByDate[dateKey]) weatherDataByDate[dateKey] = {};
+                        weatherDataByDate[dateKey][name] = {
+                            high: Math.round(day.temp.max),
+                            low: Math.round(day.temp.min),
+                            status: day.weather[0] ? day.weather[0].description : 'N/A',
+                            icon: day.weather[0] ? day.weather[0].icon : '01d'
+                        };
+                    });
+                });
+                await Promise.all(promises);
+                return weatherDataByDate;
+            }
+
+            // --- 4. CALENDAR RENDERING ---
+            function renderCalendar(weatherData) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const lastForecastDate = new Date(today);
+                lastForecastDate.setDate(today.getDate() + 15);
+
+                gridContainer.innerHTML = '';
+                daysOfWeek.forEach(day => {
+                    gridContainer.insertAdjacentHTML('beforeend', `<div class="grid-cell grid-header">${day}</div>`);
+                });
+
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const currentDate = new Date(d);
+                    const dateKey = currentDate.toISOString().slice(0, 10);
+                    const dayName = daysOfWeek[currentDate.getDay()];
+                    
+                    let dayHtml = `<div class="grid-cell calendar-day ${dateKey >= tripStartDate && dateKey <= tripEndDate ? 'trip-duration-day' : ''}">
+                                       <div class="date-number" data-day-name="${dayName}">${currentDate.toLocaleString('default', { month: 'short' })}-${currentDate.getDate()}</div>`;
+
+                    if (currentDate > lastForecastDate) {
+                        const availableOn = new Date(currentDate);
+                        availableOn.setDate(availableOn.getDate() - 15);
+                        dayHtml += `<div class="forecast-unavailable">Forecast available on ${availableOn.toLocaleString('default', { month: 'short' })} ${availableOn.getDate()}</div>`;
+                    } else {
+                        const actualLocations = getActualLocationsForDate(dateKey);
+                        const locationsToShow = new Set();
+                        for (let i = -1; i <= 1; i++) {
+                            const bufferDate = new Date(currentDate);
+                            bufferDate.setDate(bufferDate.getDate() + i);
+                            getActualLocationsForDate(bufferDate.toISOString().slice(0, 10)).forEach(loc => locationsToShow.add(loc));
+                        }
+                        
+                        locationsToShow.forEach(city => {
+                            if (weatherData[dateKey] && weatherData[dateKey][city]) {
+                                const forecast = weatherData[dateKey][city];
+                                const cityDetails = CITIES[city];
+                                const highlightClass = actualLocations.includes(city) ? cityDetails.colorClass : '';
+                                dayHtml += `<div class="weather-entry ${highlightClass}">
+                                                <div class="weather-icon"><img src="https://openweathermap.org/img/wn/${forecast.icon}@2x.png" alt="${forecast.status}"></div>
+                                                <div class="weather-details">
+                                                    <strong>${city}</strong>
+                                                    <span>${forecast.high}° / ${forecast.low}°C, ${forecast.status}</span>
+                                                </div>
+                                            </div>`;
+                            }
+                        });
+                    }
+                    dayHtml += `</div>`;
+                    gridContainer.insertAdjacentHTML('beforeend', dayHtml);
+                }
+            }
+
+            // --- 5. EXECUTION ---
+            try {
+                const liveWeatherData = await fetchAllWeatherData();
+                statusContainer.style.display = 'none';
+                renderCalendar(liveWeatherData);
+            } catch (error) {
+                console.error("Failed to fetch and render weather data:", error);
+                statusContainer.innerHTML = '';
+                errorMessage.style.display = 'block';
+                statusContainer.appendChild(errorMessage);
+            }
+        });
+    </script>
+
+</body>
+</html>
